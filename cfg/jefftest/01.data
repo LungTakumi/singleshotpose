@@ -1,6 +1,6 @@
-train  = jefftest/01/train.txt
-valid  = jefftest/01/test.txt
+train  = datasets/jefftest/01/train.txt
+valid  = datasets/jefftest/01/test.txt
 backup = backup/jefftest/01
-mesh = jefftest/01/obj_01.ply
+mesh = datasets/jefftest/01/obj_01.ply
 name = jefftest_01
 diam = 0.06479625
