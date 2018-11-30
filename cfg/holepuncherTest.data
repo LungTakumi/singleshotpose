@@ -1,0 +1,7 @@
+train  = LINEMOD/holepuncherTest/train.txt
+valid  = LINEMOD/holepuncherTest/test.txt
+backup = backup/holepuncherTest
+mesh = LINEMOD/holepuncherTest/holepuncher.ply
+tr_range = LINEMOD/holepuncherTest/training_range.txt
+name = holepuncherTest
+diam = 0.162

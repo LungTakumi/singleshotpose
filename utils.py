@@ -31,9 +31,27 @@ def calcAngularDistance(gt_rot, pr_rot):
 
 def get_camera_intrinsic():
     K = np.zeros((3, 3), dtype='float64')
-    K[0, 0], K[0, 2] = 572.4114, 325.2611
-    K[1, 1], K[1, 2] = 573.5704, 242.0489
+
+    #origional
+    #    K[0, 0], K[0, 2] = 572.4114, 325.2611
+    #    K[1, 1], K[1, 2] = 573.5704, 242.0489
+    #    K[2, 2] = 1.
+
+    #blender
+    #    K[0, 0], K[0, 2] = 1050, 480
+    #    K[1, 1], K[1, 2] = 1050, 270
+    #    K[2, 2] = 1.
+
+    #logitech C920 1
+    #K[0, 0], K[0, 2] = 380, 480
+    #K[1, 1], K[1, 2] = 550, 460
+    #K[2, 2] = 1.
+
+    #logitech C920 2
+    K[0, 0], K[0, 2] = 609.710537, 303.200522
+    K[1, 1], K[1, 2] = 606.011374, 258.905227
     K[2, 2] = 1.
+
     return K
 
 def compute_projection(points_3D, transformation, internal_calibration):
@@ -884,7 +902,7 @@ def plot_boxes(img, boxes, savename=None, class_names=None):
 def read_truths(lab_path):
     if os.path.getsize(lab_path):
         truths = np.loadtxt(lab_path)
-        truths = truths.reshape(truths.size/21, 21) # to avoid single truth problem
+        truths = truths.reshape(truths.size // 21, 21) # to avoid single truth problem
         return truths
     else:
         return np.array([])
@@ -1003,7 +1021,7 @@ def scale_bboxes(bboxes, width, height):
       
 def file_lines(thefilepath):
     count = 0
-    thefile = open(thefilepath, 'rb')
+    thefile = open(thefilepath, 'r')
     while True:
         buffer = thefile.read(8192*1024)
         if not buffer:

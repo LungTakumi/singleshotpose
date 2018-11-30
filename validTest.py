@@ -6,6 +6,8 @@ from torchvision import datasets, transforms
 import scipy.io
 import warnings
 warnings.filterwarnings("ignore")
+import matplotlib.pyplot as plt
+import scipy.misc
 
 from darknet import Darknet
 import dataset
@@ -17,7 +19,11 @@ def makedirs(path):
     if not os.path.exists( path ):
         os.makedirs( path )
 
-def valid(datacfg, cfgfile, weightfile, outfile):
+
+# In[ ]:
+
+
+def validTest(datacfg, cfgfile, weightfile):
     def truths_length(truths):
         for i in range(50):
             if truths[i][1] == 0:
@@ -43,7 +49,8 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     if use_cuda:
         os.environ['CUDA_VISIBLE_DEVICES'] = gpus
         torch.cuda.manual_seed(seed)
-    save            = True
+    save            = False
+    visualize       = True
     testtime        = True
     use_cuda        = True
     num_classes     = 1
@@ -53,6 +60,8 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     conf_thresh     = 0.1
     nms_thresh      = 0.4
     match_thresh    = 0.5
+    edges_corners = [[0, 1], [0, 2], [0, 4], [1, 3], [1, 5], [2, 3], [2, 6], [3, 7], [4, 5], [4, 6], [5, 7], [6, 7]]
+
     if save:
         makedirs(backupdir + '/test')
         makedirs(backupdir + '/test/gt')
@@ -73,12 +82,13 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     gts_trans           = []
     gts_rot             = []
     gts_corners2D       = []
+    ious                = []
 
     # Read object model information, get 3D bounding box corners
     mesh          = MeshPly(meshname)
     vertices      = np.c_[np.array(mesh.vertices), np.ones((len(mesh.vertices), 1))].transpose()
     corners3D     = get_3D_corners(vertices)
-    # diam          = calc_pts_diameter(np.array(mesh.vertices))
+    #diam          = calc_pts_diameter(np.array(mesh.vertices))
     diam          = float(options['diam'])
 
     # Read intrinsic camera parameters
@@ -114,6 +124,11 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     count = 0
     z = np.zeros((3, 1))
     for batch_idx, (data, target) in enumerate(test_loader):
+        
+        # Images
+        img = data[0, :, :, :]
+        img = img.numpy().squeeze()
+        img = np.transpose(img, (1, 2, 0))
         
         t1 = time.time()
         # Pass data to GPU
@@ -185,8 +200,8 @@ def valid(datacfg, cfgfile, weightfile, outfile):
                     gts_rot.append(R_gt)
 
                     np.savetxt(backupdir + '/test/gt/R_' + valid_files[count][-8:-3] + 'txt', np.array(R_gt, dtype='float32'))
-                    np.savetxt(backupdir + '/test/gt/t_' + valid_files[count][-8:-3] + 'txt', np.array(t_gt, dtype='float32'))
-                    np.savetxt(backupdir + '/test/pr/R_' + valid_files[count][-8:-3] + 'txt', np.array(R_pr, dtype='float32'))
+                    np.savetxt(backupdir + '/test/gt/t_' + valid_files[count][-8:-3] + 'txt', np.array(R_pr, dtype='float32'))
+                    np.savetxt(backupdir + '/test/pr/R_' + valid_files[count][-8:-3] + 'txt', np.array(t_gt, dtype='float32'))
                     np.savetxt(backupdir + '/test/pr/t_' + valid_files[count][-8:-3] + 'txt', np.array(t_pr, dtype='float32'))
                     np.savetxt(backupdir + '/test/gt/corners_' + valid_files[count][-8:-3] + 'txt', np.array(corners2D_gt, dtype='float32'))
                     np.savetxt(backupdir + '/test/pr/corners_' + valid_files[count][-8:-3] + 'txt', np.array(corners2D_pr, dtype='float32'))
@@ -203,10 +218,30 @@ def valid(datacfg, cfgfile, weightfile, outfile):
                 Rt_gt        = np.concatenate((R_gt, t_gt), axis=1)
                 Rt_pr        = np.concatenate((R_pr, t_pr), axis=1)
                 proj_2d_gt   = compute_projection(vertices, Rt_gt, internal_calibration)
-                proj_2d_pred = compute_projection(vertices, Rt_pr, internal_calibration) 
+                proj_2d_pred = compute_projection(vertices, Rt_pr, internal_calibration)  
+                proj_corners_gt = np.transpose(compute_projection(corners3D, Rt_gt, internal_calibration)) 
+                proj_corners_pr = np.transpose(compute_projection(corners3D, Rt_pr, internal_calibration)) 
                 norm         = np.linalg.norm(proj_2d_gt - proj_2d_pred, axis=0)
                 pixel_dist   = np.mean(norm)
                 errs_2d.append(pixel_dist)
+
+                if visualize:
+                    # Visualize
+                    plt.xlim((0, 640))
+                    plt.ylim((0, 480))
+                    plt.imshow(scipy.misc.imresize(img, (480, 640)))
+                    # Projections
+                    for edge in edges_corners:
+                        plt.plot(proj_corners_gt[edge, 0], proj_corners_gt[edge, 1], color='g', linewidth=3.0)
+                        plt.plot(proj_corners_pr[edge, 0], proj_corners_pr[edge, 1], color='b', linewidth=3.0)
+                    plt.gca().invert_yaxis()
+                    plt.show()
+                
+                # Compute IoU score
+                bb_gt        = compute_2d_bb_from_orig_pix(proj_2d_gt, output.size(3))
+                bb_pred      = compute_2d_bb_from_orig_pix(proj_2d_pred, output.size(3))
+                iou          = bbox_iou(bb_gt, bb_pred)
+                ious.append(iou)
 
                 # Compute 3D distances
                 transform_3d_gt   = compute_transformation(vertices, Rt_gt) 
@@ -227,6 +262,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     # Compute 2D projection error, 6D pose error, 5cm5degree error
     px_threshold = 5
     acc         = len(np.where(np.array(errs_2d) <= px_threshold)[0]) * 100. / (len(errs_2d)+eps)
+    acciou      = len(np.where(np.array(errs_2d) >= 0.5)[0]) * 100. / (len(ious)+eps)
     acc5cm5deg  = len(np.where((np.array(errs_trans) <= 0.05) & (np.array(errs_angle) <= 5))[0]) * 100. / (len(errs_trans)+eps)
     acc3d10     = len(np.where(np.array(errs_3d) <= diam * 0.1)[0]) * 100. / (len(errs_3d)+eps)
     acc5cm5deg  = len(np.where((np.array(errs_trans) <= 0.05) & (np.array(errs_angle) <= 5))[0]) * 100. / (len(errs_trans)+eps)
@@ -240,13 +276,14 @@ def valid(datacfg, cfgfile, weightfile, outfile):
         print('  tensor to cuda : %f' % (t2 - t1))
         print('         predict : %f' % (t3 - t2))
         print('get_region_boxes : %f' % (t4 - t3))
-        print('            eval : %f' % (t5 - t4))
+        print('             nms : %f' % (t5 - t4))
         print('           total : %f' % (t5 - t1))
         print('-----------------------------------')
 
     # Print test statistics
     logging('Results of {}'.format(name))
     logging('   Acc using {} px 2D Projection = {:.2f}%'.format(px_threshold, acc))
+    logging('   Acc using the IoU metric = {:.6f}%'.format(acciou))
     logging('   Acc using 10% threshold - {} vx 3D Transformation = {:.2f}%'.format(diam * 0.1, acc3d10))
     logging('   Acc using 5 cm 5 degree metric = {:.2f}%'.format(acc5cm5deg))
     logging("   Mean 2D pixel error is %f, Mean vertex error is %f, mean corner error is %f" % (mean_err_2d, np.mean(errs_3d), mean_corner_err_2d))
@@ -255,15 +292,16 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     if save:
         predfile = backupdir + '/predictions_linemod_' + name +  '.mat'
         scipy.io.savemat(predfile, {'R_gts': gts_rot, 't_gts':gts_trans, 'corner_gts': gts_corners2D, 'R_prs': preds_rot, 't_prs':preds_trans, 'corner_prs': preds_corners2D})
-
+		
 if __name__ == '__main__':
     import sys
     if len(sys.argv) == 4:
         datacfg = sys.argv[1]
         cfgfile = sys.argv[2]
         weightfile = sys.argv[3]
-        outfile = 'comp4_det_test_'
-        valid(datacfg, cfgfile, weightfile, outfile)
+        validTest(datacfg, cfgfile, weightfile)
     else:
         print('Usage:')
-        print(' python valid.py datacfg cfgfile weightfile')
+        print(' python validTest.py datacfg cfgfile weightfile')
+
+
