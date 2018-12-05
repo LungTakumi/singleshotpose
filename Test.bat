@@ -1,1 +1,0 @@
-python train.py cfg/jefftest/01.data cfg/yolo-pose-pre.cfg cfg/darknet19_448.conv.23
