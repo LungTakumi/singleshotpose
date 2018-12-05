@@ -1,1 +1,0 @@
-python videoStream.py cfg/holepuncherTest.data cfg/yolo-pose.cfg backup/holepuncherTest/model_backup.weights
