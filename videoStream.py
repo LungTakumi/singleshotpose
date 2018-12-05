@@ -99,7 +99,7 @@ class videoStream(object):
                         for edge in self.edges_corners:
                             px = proj_corners_pr[edge, 0]
                             py = proj_corners_pr[edge, 1]
-                            cv2.line(img,(px[0], int(480 - py[0])), (px[1], int(480 - py[1])), (255,0,0), 3)
+                            cv2.line(img,(px[0], py[0]), (px[1], py[1]), (255,0,0), 3)
                 else:
                     R_pr, t_pr = self.process(image)
             
