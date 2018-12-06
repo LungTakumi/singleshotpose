@@ -64,11 +64,12 @@ class SSP(Thread):
         if(len(boxes) == 0):
             return boxes
 
-        box_pr = boxes[0]
+        best_conf_est = -1
         # If the prediction has the highest confidence, choose it as our prediction for single object pose estimation
         for i in range(len(boxes)):
-            if (boxes[i][18] > box_pr[18]):
+            if (boxes[i][18] > best_conf_est):
                 box_pr        = boxes[i]
+                best_conf_est = boxes[i][18]
 
         # Denormalize the corner predictions 
         corners2D_pr = np.array(np.reshape(box_pr[:18], [9, 2]), dtype='float32')            
@@ -80,7 +81,7 @@ class SSP(Thread):
         Rt_pr        = np.concatenate((R_pr, t_pr), axis=1)
         proj_corners_pr = np.transpose(compute_projection(self.corners3D, Rt_pr, self.internal_calibration))
 
-        return R_pr, t_pr, proj_corners_pr
+        return R_pr, t_pr, proj_corners_pr, best_conf_est
 
     def run(self):
         t = time.time()
@@ -88,12 +89,13 @@ class SSP(Thread):
         while True:
             f += 1
             image = self.queueIn.get()
-            R_pr, t_pr, proj_corners_pr = self.process(image)
+            R_pr, t_pr, proj_corners_pr, best_conf_est = self.process(image)
             
             fps = f//(time.time() - t + 0.000001)
-            self.queueOut.put((proj_corners_pr, fps))
+            self.queueOut.put((proj_corners_pr, fps, best_conf_est))
 
             print("FPS: "+str(fps))
+            print("best_conf_est: "+str(best_conf_est))
             print("R_pr: ")
             print(R_pr)
             print("t_pr: ")
