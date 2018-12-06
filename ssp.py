@@ -90,10 +90,9 @@ class SSP(Thread):
             image = self.queueIn.get()
             R_pr, t_pr, proj_corners_pr = self.process(image)
             
-            self.queueOut.put(proj_corners_pr)
-
             fps = f//(time.time() - t + 0.000001)
-            
+            self.queueOut.put((proj_corners_pr, fps))
+
             print("FPS: "+str(fps))
             print("R_pr: ")
             print(R_pr)
