@@ -19,9 +19,10 @@ from videoStream import VideoStream
 from queue import Queue
 
 class SSP(Thread):
-    def __init__(self, datacfg, cfgfile, weightfile, queue):
+    def __init__(self, datacfg, cfgfile, weightfile, queueIn, queueOut):
         Thread.__init__(self) 
-        self.queue = queue
+        self.queueIn = queueIn
+        self.queueOut = queueOut
         # Parse configuration files
         options      = read_data_cfg(datacfg)
         meshname     = options['mesh']
@@ -39,7 +40,6 @@ class SSP(Thread):
         self.num_classes     = 1
         self.conf_thresh     = 0.1
         self.nms_thresh      = 0.4
-        self.edges_corners = [[0, 1], [0, 2], [0, 4], [1, 3], [1, 5], [2, 3], [2, 6], [3, 7], [4, 5], [4, 6], [5, 7], [6, 7]]
 
         # Read object model information, get 3D bounding box corners
         mesh          = MeshPly(meshname)
@@ -77,16 +77,21 @@ class SSP(Thread):
 
         R_pr, t_pr = pnp(np.array(np.transpose(np.concatenate((np.zeros((3, 1)), self.corners3D[:3, :]), axis=1)), dtype='float32'),  corners2D_pr, np.array(self.internal_calibration, dtype='float32'))
 
-        return R_pr, t_pr
+        Rt_pr        = np.concatenate((R_pr, t_pr), axis=1)
+        proj_corners_pr = np.transpose(compute_projection(self.corners3D, Rt_pr, self.internal_calibration))
+
+        return R_pr, t_pr, proj_corners_pr
 
     def run(self):
         t = time.time()
         f = 0
         while True:
             f += 1
-            image = self.queue.get()
-            R_pr, t_pr = self.process(image)
+            image = self.queueIn.get()
+            R_pr, t_pr, proj_corners_pr = self.process(image)
             
+            self.queueOut.put(proj_corners_pr)
+
             fps = f//(time.time() - t + 0.000001)
             
             print("FPS: "+str(fps))
@@ -102,13 +107,15 @@ if __name__ == '__main__':
         cfgfile = sys.argv[2]
         weightfile = sys.argv[3]
 
-        queue = Queue()
+        queueIn = Queue()
+        queueOut = Queue()
 
-        ssp = SSP(datacfg, cfgfile, weightfile, queue)
+        ssp = SSP(datacfg, cfgfile, weightfile, queueIn, queueOut)
         ssp.start()
-        vid = VideoStream(queue)
+        vid = VideoStream(queueIn, queueOut)
         vid.start()
-        queue.join()
+        queueIn.join()
+        queueOut.join()
     else:
         print('Usage:')
         print(' python videoStream.py datacfg cfgfile weightfile')
