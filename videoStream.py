@@ -44,6 +44,9 @@ class VideoStream(Thread):
 
 
             fps = f//(time.time() - t + 0.000001)
+            if(time.time() - t >= 1):
+                f = 0
+                t = time.time()
             image = cv2.putText(image, "FPS: "+str(fps), (15,40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 1)
             image = cv2.putText(image, "pFPS: "+str(pfps), (15,80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 1)
             image = cv2.putText(image, "best_conf_est: "+str(best_conf_est), (15,440), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,0), 1)

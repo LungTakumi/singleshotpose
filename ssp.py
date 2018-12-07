@@ -92,6 +92,9 @@ class SSP(Thread):
             R_pr, t_pr, proj_corners_pr, best_conf_est = self.process(image)
             
             fps = f//(time.time() - t + 0.000001)
+            if(time.time() - t >= 1):
+                f = 0
+                t = time.time()
             self.queueOut.put((proj_corners_pr, fps, best_conf_est))
 
             print("FPS: "+str(fps))
