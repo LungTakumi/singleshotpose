@@ -23,9 +23,12 @@ class VideoStream(Thread):
             f += 1
             waitFrame += 1
             success, image = cap.read()
-            if(waitFrame >= 2):
-                waitFrame = 0
-                self.queueIn.put(image)
+            #if(waitFrame >= 1):
+            #    waitFrame = 0
+            try:
+                self.queueIn.put(image, False)
+            except queue.Full:
+                pass
             
             image = cv2.resize(image, (640,480))
             try:
@@ -47,7 +50,6 @@ class VideoStream(Thread):
             cv2.imshow('object detection', image)
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
-                self.queueIn.task_done()
                 break
         cap.release()
 

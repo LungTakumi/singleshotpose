@@ -108,15 +108,13 @@ if __name__ == '__main__':
         cfgfile = sys.argv[2]
         weightfile = sys.argv[3]
 
-        queueIn = Queue()
+        queueIn = Queue(1)
         queueOut = Queue()
 
         ssp = SSP(datacfg, cfgfile, weightfile, queueIn, queueOut)
         ssp.start()
         vid = VideoStream(queueIn, queueOut)
         vid.start()
-        queueIn.join()
-        queueOut.join()
     else:
         print('Usage:')
         print(' python videoStream.py datacfg cfgfile weightfile')
